@@ -182,7 +182,7 @@ class AnyUrl(str):
         if user or password:
             url += '@'
         url += host
-        if port and ('port' not in cls.hidden_parts):
+        if port and ('port' not in cls.hidden_parts):  # type: ignore
             url += ':' + port
         if path:
             url += path
@@ -214,7 +214,11 @@ class AnyUrl(str):
         assert m, 'URL regex failed unexpectedly'
 
         original_parts = cast('Parts', m.groupdict())
-        cls.hide_parts(original_parts)
+
+        cls.hidden_parts = cls.hidden_parts if cls.hidden_parts else set()
+        parts_to_hide = cls.hide_parts(original_parts)
+        cls.hidden_parts = cls.hidden_parts.union(parts_to_hide)
+
         parts = cls.apply_default_parts(original_parts)
         parts = cls.validate_parts(parts)
 
@@ -304,9 +308,9 @@ class AnyUrl(str):
     def get_default_parts(parts: 'Parts') -> 'Parts':
         return {}
 
-    @classmethod
-    def hide_parts(cls, original_parts: 'Parts') -> None:
-        cls.hidden_parts = set()
+    @staticmethod
+    def hide_parts(original_parts: 'Parts') -> Set[str]:
+        return set()
 
     @classmethod
     def apply_default_parts(cls, parts: 'Parts') -> 'Parts':
@@ -329,15 +333,15 @@ class HttpUrl(AnyHttpUrl):
     # https://stackoverflow.com/questions/417142/what-is-the-maximum-length-of-a-url-in-different-browsers
     max_length = 2083
 
-    @staticmethod
-    def get_default_parts(parts: 'Parts') -> 'Parts':
-        return {'port': '80' if parts['scheme'] == 'http' else '443'}
-
     @classmethod
-    def hide_parts(cls, original_parts: 'Parts') -> None:
-        super().hide_parts(original_parts)
+    def hide_parts(cls, original_parts: 'Parts') -> Set[str]:
         if 'port' in original_parts:
-            cls.hidden_parts.add('port')
+            return {'port'}
+        return set()
+
+    @staticmethod
+    def get_default_parts(original_parts: 'Parts') -> 'Parts':
+        return {'port': '80' if original_parts['scheme'] == 'http' else '443'}
 
 
 class PostgresDsn(AnyUrl):
